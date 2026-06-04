@@ -22,10 +22,19 @@ from overlord.evaluator import OverlordEvaluator
 
 class GameEngine:
 
-    def __init__(self, config: dict, replay_path: str, verbose: bool = False):
+    def __init__(self, config: dict, replay_path: str, verbose: bool = False, trace_path: str = None):
         self.config   = config
         self.verbose  = verbose
         self.cycle    = 0
+        self.trace_path = trace_path
+
+        # Clear trace file on start if specified
+        if self.trace_path:
+            try:
+                with open(self.trace_path, "w", encoding="utf-8") as f:
+                    f.write("# Prompt Wars LLM Call Trace\n\n")
+            except Exception as e:
+                print(f"Error initializing trace file: {e}")
 
         # Board
         self.board = Board(config["board"])
@@ -41,10 +50,10 @@ class GameEngine:
         self.writer     = StateWriter(replay_path)
 
         # LLM
-        self.llm = OllamaClient(config["llm"])
+        self.llm = OllamaClient(config["llm"], verbose=self.verbose, trace_path=self.trace_path)
 
         # Overlord — use same Ollama client with different temperature
-        overlord_llm = OllamaClient({**config["llm"], **config["overlord"]})
+        overlord_llm = OllamaClient({**config["llm"], **config["overlord"]}, verbose=self.verbose, trace_path=self.trace_path)
         self.map_gen   = MapGenerator(overlord_llm, config["overlord"])
         self.evaluator = OverlordEvaluator(overlord_llm, config["overlord"])
 
@@ -75,7 +84,7 @@ class GameEngine:
 
         while True:
             self.cycle += 1
-            self._log(f"── Cycle {self.cycle} ──────────────────────")
+            self._log(f"=== Cycle {self.cycle} ======================")
 
             self._run_phase_1()
             win_result = self._run_phase_2()
@@ -86,7 +95,7 @@ class GameEngine:
             )
 
             if win_result["game_over"]:
-                print(f"\n  Game over — {win_result['termination_reason']}")
+                print(f"\n  Game over - {win_result['termination_reason']}")
                 verdict = self.evaluator.evaluate(
                     self.board, self.bots, self.destruction_log,
                     self.cycle, win_result["termination_reason"]

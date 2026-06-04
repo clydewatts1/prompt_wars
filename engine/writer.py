@@ -15,13 +15,21 @@ class StateWriter:
 
     def __init__(self, path: str):
         self.path = path
+        self.records = []
         # Clear file on start
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             pass
 
     def _append(self, record: dict):
-        with open(self.path, "a") as f:
-            f.write(json.dumps(record) + "\n")
+        self.records.append(record)
+        import os
+        _, ext = os.path.splitext(self.path.lower())
+        if ext == '.json':
+            with open(self.path, "w", encoding="utf-8") as f:
+                json.dump(self.records, f, indent=2)
+        else:
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record) + "\n")
 
     def write_handshake(self, config: dict, board: Board, bots: list,
                          handshake: dict, map_directive: dict):

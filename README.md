@@ -1,2 +1,149 @@
-# prompt_wars
-A prompt driven game loosely based on core wars
+# ⚔️ Prompt Wars
+
+> **Status:** Early development version (Pre-Alpha)
+
+**Prompt Wars** is an asynchronous, spatial multi-agent AI strategy game played on a hexagonal grid, heavily inspired by classic programming games like *Core War*, *Screeps*, and *Halite*. 
+
+Instead of writing traditional deterministic code (loops, conditional checks), players write **LLM System Prompts**. These prompts define the behavior, strategy, and personality of their agents (Bots) as they compete, survive, forage, build, and adapt on the battlefield.
+
+For the exhaustive specification, check out the [Prompt Wars Game Design & Architecture Document](file:///c:/Users/cw171001/OneDrive%20-%20Teradata/Documents/GitHub/prompt_wars/Prompt%20Wars_%20Game%20Design%20&%20Architecture.md).
+
+---
+
+## 🏗️ System Architecture
+
+Prompt Wars runs on a decoupled, backend-frontend model:
+1. **Game Backend (Python Engine):** Renders no graphics. It manages the core simulation, handles game mechanics (HP, Compute, grid movement, weapon resolution), compiles radar/telemetry, and orchestrates sequential API calls to a local LLM (Ollama).
+2. **Replay Log (`replay.jsonl`):** Every turn, action, telemetry frame, and raw ReAct "thought" is logged to a local JSON Lines file.
+3. **Game Frontend (Visualizer):** Renders the visual hex board, unit tokens, and displays step-by-step agent reasoning logs using the replay file.
+
+---
+
+## 🎮 Core Gameplay Mechanics
+
+### 🧭 Hexagonal Coordinates
+The board is a **pointy-topped hexagonal grid** using an **Axial Coordinate System** $(q, r)$, which is a 2D projection of 3D Cube Coordinates $(q, r, s)$, satisfying the invariant:
+$$q + r + s = 0 \implies s = -q - r$$
+
+All coordinate calculations, distance calculations, and movements use the six compass direction vectors:
+* **East (E):** `(1, 0)`
+* **South-East (SE):** `(0, 1)`
+* **South-West (SW):** `(-1, 1)`
+* **West (W):** `(-1, 0)`
+* **North-West (NW):** `(0, -1)`
+* **North-East (NE):** `(1, -1)`
+
+---
+
+### 🗺️ Terrain Ecosystem
+
+Each hex cell has unique attributes influencing movement speed, defense cover, and resource yields:
+
+| Terrain Type | Traversable? | Food Pool | Cover Bonus | Capture Cost | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Ground (Dirt)** | Yes | 0 | 0% | 1 Turn | Basic paths. Cheap and fast to cross (2 Compute). |
+| **Grass** | Yes | Low-Med (20) | 10% | 2 Turns | Regenerating meadows. Slows movement (2 Compute). |
+| **Tree (Forest)** | Yes | High (50) | 30% | 3 Turns | Resource-rich forests. High movement cost (4 Compute). |
+| **Asteroid (Rock)**| No | 0 | 100% | N/A | Impassable obstacle. Completely blocks lasers and peek sweeps. |
+| **Control Node** | Yes | 0 | 15% | 2 Turns | Strategic hex. Controlling it provides passive team Compute. |
+
+---
+
+### 🤖 Bot States & ReAct Loop
+On every turn, each bot receives a **Telemetry Frame** (radar data, coordinates, current HP, and Compute) and its own compressed **Memory String** from the previous turn. It must respond with a ReAct payload:
+1. **`thought`**: A plain-text reasoning sequence explaining its strategic choices.
+2. **`action`**: A single command from the actions vocabulary.
+3. **`save_memory`**: A compressed string (up to 400 characters) containing key details it needs to remember for the next turn.
+
+---
+
+## ⚔️ Commands Vocabulary
+
+Bots can perform one of the following commands each turn:
+
+| Action Command | Parameter Needed | Compute Cost | Game Effect |
+| :--- | :--- | :--- | :--- |
+| `"next"` | None | 0 | Skip turn, conserving compute pool. |
+| `"move"` | `"direction"` | 2 (Ground) / 4 (Forest) | Step 1 hex in the target direction. |
+| `"eat"` | None | 1 | Harvest food from current hex, or salvage 30 Compute from wreckage. |
+| `"capture"` | None | 3 | Claim or progress control over the current hex. |
+| `"attack"` | `"direction"` | 5 | Fire a linear laser beam up to Range 2, dealing 20 damage. |
+| `"peek"` | `"direction"` | 1 | Run an active directional radar sweep up to Range 3. |
+| `"build"` | `"direction"`, `"target_structure"` | 8 | Build a structure (`barricade` or `collector`) on an adjacent hex. |
+
+### 🚧 Construction & Structures
+Bots can construct adjacent structures to manipulate the battlefield:
+* **Barricade (50 HP):** Block passage and absorb laser hits. Used for defensive fortifications and blocking line-of-sight.
+* **Collector (20 HP):** Must be placed on Grass or Tree tiles. Generates +5 passive Compute Units for the owner's team every turn.
+
+When destroyed, structures leave behind **Wreckage** containing scrap that bots can `eat` to recover Compute.
+
+---
+
+## 🚀 Running the Game
+
+### 1. Install Dependencies
+Ensure you have the required packages installed in your virtual environment:
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Run a Game Simulation
+Run the simulation backend, passing a game configuration file (supports both `.json` and `.yaml`/`.yml` formats):
+```bash
+python game.py --config config/game.yaml
+```
+
+### 3. Optional Command-Line Flags
+* **Enable Verbose Output:** Prints turn-by-turn logs to stdout.
+  ```bash
+  python game.py --config config/game.yaml --verbose
+  ```
+* **Custom Replay File:** Specify a custom file path for the replay logs (defaults to `replay.jsonl`).
+  ```bash
+  python game.py --config config/game.yaml --replay output/my_match.jsonl
+  ```
+
+---
+
+## 🖥️ Running the Web Visualizer
+
+The game includes a sleek, interactive React-based visualizer map to play back and inspect simulated matches:
+
+### 1. Install Visualizer Dependencies
+Install the required Python packages for the backend server:
+```bash
+pip install -r visualizer/requirements.txt
+```
+
+### 2. Start the Backend Server
+Run the Flask server from the root of the repository:
+```bash
+python visualizer/server.py
+```
+This runs a local server on port `5000` serving the visualizer.
+
+### 3. Open the Visualizer
+Open [http://localhost:5000](http://localhost:5000) in your web browser.
+
+### 4. Key Visualizer Features:
+* **Battlefield Playback Controls:** Play, pause, timeline scrubbing, speed control, and a "Live Sync" mode that automatically loads new turns as they are simulated.
+* **Overlord Winner Banner:** Confetti-accented glassmorphic standings card dynamically displaying the winning bot, score, and the Overlord's strategic match verdict.
+* **ReAct Log HUD:** Click on any bot on the map to see its real-time HP, Compute, Memory string, and historical decision-making traces in the sidebar.
+* **System Prompt Hover Tooltips:** Hover over the `ℹ️` icon next to any bot's name in the sidebar to review its system prompt configuration.
+* **Arbitrary Replay Loading:** The visualizer handles arbitrary replay files like `replay.json`, `replay_game.json`, and `replay.jsonl`. If configuration files in `config/` are deleted or mismatch, the visualizer automatically recovers and syncs the exact bot prompts and rules embedded inside the replay file's initial `handshake` record.
+
+---
+
+## 🛠️ Configuration
+
+Matches can be configured using either a JSON or YAML format:
+* **YAML format:** [config/game.yaml](file:///c:/Users/cw171001/OneDrive%20-%20Teradata/Documents/GitHub/prompt_wars/config/game.yaml) (Recommended - easier to format and write system prompts)
+* **JSON format:** [config/game.json](file:///c:/Users/cw171001/OneDrive%20-%20Teradata/Documents/GitHub/prompt_wars/config/game.json)
+
+You can define:
+* Board radius
+* Turn limits
+* LLM provider configuration (defaults to local **Ollama** running models like `llama3`)
+* Bot profiles (unique names, teams, and the core **System Prompts** that drive them).
+
