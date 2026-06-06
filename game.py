@@ -13,6 +13,20 @@ import json
 import sys
 import os
 
+# Load environment variables from .env file if available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Manual fallback parser for .env files if package not yet installed
+    if os.path.exists(".env"):
+        with open(".env", "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ[k.strip()] = v.strip()
+
 # Ensure project root is on path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -74,6 +88,20 @@ Examples:
     except Exception as e:
         print(f"Error: failed to parse config file {args.config}: {e}")
         sys.exit(1)
+
+    # Validate Gemini provider API key
+    llm_provider = config.get("llm", {}).get("provider", "ollama").lower()
+    if llm_provider == "gemini":
+        gemini_key = config.get("llm", {}).get("api_key") or os.environ.get("GEMINI_API_KEY")
+        if not gemini_key:
+            print("\n" + "="*80)
+            print("ERROR: GEMINI_API_KEY is not defined!")
+            print("To use the 'gemini' provider, you must either:")
+            print("  1. Create a '.env' file in the root folder with: GEMINI_API_KEY=your_key")
+            print("  2. Set the GEMINI_API_KEY environment variable in your terminal")
+            print("  3. Define 'api_key' inside config.yaml under the 'llm' section")
+            print("="*80 + "\n")
+            sys.exit(1)
 
     # Ensure output directories exist
     replay_dir = os.path.dirname(args.replay)

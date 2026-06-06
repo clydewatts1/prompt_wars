@@ -123,6 +123,9 @@ function App() {
           <div className="legend-item"><div className="legend-color" style={{backgroundColor: 'var(--hex-wreckage)'}}></div> Wreckage</div>
           <div className="legend-item"><div className="legend-color" style={{backgroundColor: 'var(--hex-ground)'}}></div> Ground</div>
           <div className="legend-item"><div className="legend-color" style={{backgroundColor: 'var(--hex-asteroid)'}}></div> Asteroid</div>
+          <div className="legend-item"><div className="legend-color" style={{backgroundColor: '#fff', border: '1px solid #000', borderRadius: '50%'}}></div> Ball</div>
+          <div className="legend-item"><div className="legend-color" style={{borderColor: '#facc15', borderWidth: '2px', borderStyle: 'solid', backgroundColor: 'transparent'}}></div> Goal</div>
+          <div className="legend-item"><div className="legend-color" style={{backgroundColor: '#9ca3af', border: '1px solid #4b5563'}}></div> Rock</div>
         </div>
         <PlaybackControls 
           replay={replay}

@@ -1,0 +1,125 @@
+game_id: "football_01"
+football_mode: true
+board:
+  radius: 8
+  boundary_type: "hard_wall"
+  storm_enabled: false
+  storm_start_cycle: null
+  storm_shrink_interval: null
+  balls:
+    - [0, 0]
+  goals:
+    - [-8, 0] # Red goal
+    - [8, 0]  # Blue goal
+  rocks:
+    - [0, 2]
+    - [0, -2]
+rules:
+  turn_limit: 200
+  memory_max_characters: 400
+  starvation_warning_threshold: 20
+  max_cycles: 1
+llm:
+  provider: "ollama"
+  model: "llama3.2:latest"
+  base_url: "http://127.0.0.1:11434"
+  temperature: 0.7
+  timeout_seconds: 60
+overlord:
+  model: "llama3.2:latest"
+  temperature: 0.2
+  map_system_prompt: >
+    You are the Prompt Wars Overlord. Design a symmetric football field.
+    Return ONLY valid JSON matching this schema:
+    {
+      "map_name": "Football Stadium",
+      "description": "A perfectly symmetric grassy pitch with forest boundaries.",
+      "strategic_intent": "symmetric_football"
+    }
+
+bots:
+  # TEAM RED
+  - bot_id: "red_1"
+    name: "Red-Striker"
+    team: "red"
+    q: -2
+    r: 0
+    system_prompt: >
+      You are Red-Striker. Your primary goal is to kick the ball East towards the Blue goal at [8, 0].
+      If you see the ball, use the 'kick' action to send it East.
+      If you are not near the ball, move towards it.
+      
+  - bot_id: "red_2"
+    name: "Red-Winger-N"
+    team: "red"
+    q: -3
+    r: -2
+    system_prompt: >
+      You are Red-Winger-N. Support your striker by keeping the ball moving East. Kick it if it comes near you.
+      
+  - bot_id: "red_3"
+    name: "Red-Winger-S"
+    team: "red"
+    q: -3
+    r: 2
+    system_prompt: >
+      You are Red-Winger-S. Support your striker by keeping the ball moving East. Kick it if it comes near you.
+      
+  - bot_id: "red_4"
+    name: "Red-Defender"
+    team: "red"
+    q: -5
+    r: 0
+    system_prompt: >
+      You are Red-Defender. Prevent the ball from reaching your goal at [-8, 0]. Push rocks to block paths, or kick the ball away.
+      
+  - bot_id: "red_5"
+    name: "Red-Goalie"
+    team: "red"
+    q: -7
+    r: 0
+    system_prompt: >
+      You are Red-Goalie. Stay near your goal at [-8, 0] and aggressively clear the ball if it comes close.
+
+  # TEAM BLUE
+  - bot_id: "blue_1"
+    name: "Blue-Striker"
+    team: "blue"
+    q: 2
+    r: 0
+    system_prompt: >
+      You are Blue-Striker. Your primary goal is to kick the ball West towards the Red goal at [-8, 0].
+      If you see the ball, use the 'kick' action to send it West.
+      If you are not near the ball, move towards it.
+      
+  - bot_id: "blue_2"
+    name: "Blue-Winger-N"
+    team: "blue"
+    q: 3
+    r: -2
+    system_prompt: >
+      You are Blue-Winger-N. Support your striker by keeping the ball moving West. Kick it if it comes near you.
+      
+  - bot_id: "blue_3"
+    name: "Blue-Winger-S"
+    team: "blue"
+    q: 3
+    r: 2
+    system_prompt: >
+      You are Blue-Winger-S. Support your striker by keeping the ball moving West. Kick it if it comes near you.
+      
+  - bot_id: "blue_4"
+    name: "Blue-Defender"
+    team: "blue"
+    q: 5
+    r: 0
+    system_prompt: >
+      You are Blue-Defender. Prevent the ball from reaching your goal at [8, 0]. Push rocks to block paths, or kick the ball away.
+      
+  - bot_id: "blue_5"
+    name: "Blue-Goalie"
+    team: "blue"
+    q: 7
+    r: 0
+    system_prompt: >
+      You are Blue-Goalie. Stay near your goal at [8, 0] and aggressively clear the ball if it comes close.

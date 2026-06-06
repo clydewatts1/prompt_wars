@@ -43,6 +43,12 @@ class ActionResolver:
 
         elif act == "build":
             return self._resolve_build(bot, action)
+        
+        elif act == "push":
+            return self._resolve_push(bot, action)
+        
+        elif act == "kick":
+            return self._resolve_kick(bot, action)
 
         return 0
 
@@ -204,6 +210,55 @@ class ActionResolver:
         return cost
 
     # ── helpers ────────────────────────────────────────────────────────────────
+
+    def _resolve_push(self, bot: Bot, action: dict) -> int:
+        cost = action.get("energy", 1)
+        direction = action["direction"]
+        
+        nq, nr = self.board.neighbour(bot.q, bot.r, direction)
+        target_cell = self.board.get_cell(nq, nr)
+        
+        if not target_cell or not target_cell.rock:
+            bot.deduct_compute(cost)
+            return cost
+            
+        current_rock_q, current_rock_r = nq, nr
+        
+        for _ in range(cost):
+            next_q, next_r = self.board.neighbour(current_rock_q, current_rock_r, direction)
+            next_cell = self.board.get_cell(next_q, next_r)
+            
+            if not self.board.is_valid(next_q, next_r):
+                break
+            if next_cell and not next_cell.is_passable():
+                break
+                
+            current_rock_q, current_rock_r = next_q, next_r
+            
+        target_cell.rock = False
+        final_cell = self.board.get_cell(current_rock_q, current_rock_r)
+        if final_cell:
+            final_cell.rock = True
+            
+        bot.deduct_compute(cost)
+        return cost
+
+    def _resolve_kick(self, bot: Bot, action: dict) -> int:
+        cost = 3
+        direction = action["direction"]
+        nq, nr = self.board.neighbour(bot.q, bot.r, direction)
+        target_cell = self.board.get_cell(nq, nr)
+        
+        if not target_cell or target_cell.ball is None:
+            bot.deduct_compute(cost)
+            return cost
+            
+        target_cell.ball["velocity_direction"] = direction
+        target_cell.ball["owner_id"] = bot.bot_id
+        target_cell.ball["age"] = 0
+        
+        bot.deduct_compute(cost)
+        return cost
 
     def _direction_vector(self, direction: str):
         from engine.board import DIRECTIONS

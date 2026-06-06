@@ -27,6 +27,8 @@ def build_handshake(config: dict) -> dict:
                 "peek_action": 1,
                 "attack_laser": 5,
                 "build_action": 8,
+                "push_action": "variable (energy)",
+                "kick_action": 3,
             },
             "weapon_parameters": {
                 "range": 2,
@@ -51,8 +53,8 @@ def build_handshake(config: dict) -> dict:
         ],
         "response_schema": {
             "thought": "string — your reasoning this turn",
-            "action": "string — one of the valid action commands",
-            "direction": "string — required for move, attack, peek, build",
+            "action": "string — one of the valid action commands (move, eat, capture, peek, attack, build, push, kick)",
+            "direction": "string — required for move, attack, peek, build, push, kick",
             "target_structure": "string — required for build: barricade or collector",
             "save_memory": f"string — your memory for next turn, max {config['rules']['memory_max_characters']} characters",
         }
@@ -105,15 +107,16 @@ def _serialize_current_cell(cell) -> dict:
         return {}
     return {
         "terrain": cell.terrain.value,
-        "current_food": cell.current_food,
+        "food": cell.current_food,
         "max_food": cell.max_food,
         "owner": cell.owner,
         "capture_progress": cell.capture_progress,
         "structure": cell.structure.serialize() if cell.structure else None,
-        "wreckage": {
-            "source_bot_name": cell.wreckage.source_bot_name,
-            "salvage_compute": cell.wreckage.salvage_compute,
-        } if cell.wreckage else None,
+        "wreckage": cell.wreckage.serialize() if cell.wreckage else None,
+        "occupant_id": cell.occupant_id,
+        "rock": cell.rock,
+        "ball": cell.ball,
+        "goal": cell.goal,
     }
 
 
@@ -140,6 +143,9 @@ def _build_passive_radar(bot: Bot, board: Board) -> list:
             "structure": cell.structure.serialize() if cell.structure else None,
             "wreckage": cell.wreckage.serialize() if cell.wreckage else None,
             "occupant_id": cell.occupant_id,
+            "rock": cell.rock,
+            "ball": cell.ball,
+            "goal": cell.goal,
         }
         radar.append(entry)
     return radar

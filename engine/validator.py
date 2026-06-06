@@ -9,7 +9,7 @@ from engine.board import Board, DIRECTIONS
 from engine.bot import Bot
 
 
-VALID_ACTIONS = ["move", "eat", "attack", "peek", "build", "capture", "next"]
+VALID_ACTIONS = ["move", "eat", "attack", "peek", "build", "capture", "next", "push", "kick"]
 VALID_DIRECTIONS = list(DIRECTIONS.keys())
 VALID_STRUCTURES = ["barricade", "collector"]
 
@@ -22,6 +22,7 @@ ACTION_COSTS = {
     "attack":  5,
     "peek":    1,
     "build":   8,
+    "kick":    3,
 }
 
 
@@ -42,8 +43,18 @@ class Validator:
             return None, {"reason": "invalid_json", "compute_deducted": 0,
                           "action_attempted": None}
 
+        # Clean markdown code blocks if present
+        cleaned = raw.strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
         try:
-            data = json.loads(raw)
+            data = json.loads(cleaned)
         except (json.JSONDecodeError, ValueError):
             return None, {"reason": "invalid_json", "compute_deducted": 0,
                           "action_attempted": None}
@@ -59,7 +70,7 @@ class Validator:
                           "action_attempted": None}
 
         # Direction required for directional actions
-        if action in ["move", "attack", "peek", "build"]:
+        if action in ["move", "attack", "peek", "build", "push", "kick"]:
             if data.get("direction") not in VALID_DIRECTIONS:
                 return None, {"reason": "invalid_json", "compute_deducted": 0,
                               "action_attempted": action}
@@ -67,6 +78,13 @@ class Validator:
         # Build requires target_structure
         if action == "build":
             if data.get("target_structure") not in VALID_STRUCTURES:
+                return None, {"reason": "invalid_json", "compute_deducted": 0,
+                              "action_attempted": action}
+
+        # Push requires energy
+        if action == "push":
+            energy = data.get("energy")
+            if not isinstance(energy, int) or energy < 1:
                 return None, {"reason": "invalid_json", "compute_deducted": 0,
                               "action_attempted": action}
 
@@ -118,11 +136,19 @@ class Validator:
         if act == "capture":
             return self._validate_capture(bot, board, cost)
 
+        if act == "push":
+            return self._validate_push(bot, action, board, cost)
+
+        if act == "kick":
+            return self._validate_kick(bot, action, board, cost)
+
         # peek and next always valid if compute sufficient
         return True, None
 
     def _get_cost(self, bot: Bot, action: dict, board: Board) -> int:
         act = action["action"]
+        if act == "push":
+            return action.get("energy", 1)
         if act == "move":
             nq, nr = board.neighbour(bot.q, bot.r, action["direction"])
             target = board.get_cell(nq, nr)
@@ -209,4 +235,34 @@ class Validator:
         if not cell:
             return False, {"reason": "illegal_action", "detail": "no_cell",
                            "compute_deducted": cost, "action_attempted": "capture"}
+        return True, None
+
+    def _validate_push(self, bot: Bot, action: dict, board: Board, cost: int):
+        direction = action["direction"]
+        nq, nr = board.neighbour(bot.q, bot.r, direction)
+
+        if not board.is_valid(nq, nr):
+            return False, {"reason": "illegal_action", "detail": "out_of_bounds",
+                           "compute_deducted": cost, "action_attempted": "push"}
+
+        target = board.get_cell(nq, nr)
+        if not target or not target.rock:
+            return False, {"reason": "illegal_action", "detail": "no_rock_to_push",
+                           "compute_deducted": cost, "action_attempted": "push"}
+
+        return True, None
+
+    def _validate_kick(self, bot: Bot, action: dict, board: Board, cost: int):
+        direction = action["direction"]
+        nq, nr = board.neighbour(bot.q, bot.r, direction)
+
+        if not board.is_valid(nq, nr):
+            return False, {"reason": "illegal_action", "detail": "out_of_bounds",
+                           "compute_deducted": cost, "action_attempted": "kick"}
+
+        target = board.get_cell(nq, nr)
+        if not target or target.ball is None:
+            return False, {"reason": "illegal_action", "detail": "no_ball_to_kick",
+                           "compute_deducted": cost, "action_attempted": "kick"}
+
         return True, None

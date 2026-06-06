@@ -133,7 +133,16 @@ class OverlordEvaluator:
                            termination_reason: str) -> dict:
         """Parse Overlord response. Fall back to score-based verdict on failure."""
         try:
-            data = json.loads(raw) if raw else {}
+            cleaned = raw.strip() if raw else ""
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            elif cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+
+            data = json.loads(cleaned) if cleaned else {}
             if "winner" not in data or "bot_evaluations" not in data:
                 raise ValueError("Missing required evaluation fields")
             return data

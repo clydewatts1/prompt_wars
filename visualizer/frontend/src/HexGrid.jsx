@@ -134,6 +134,56 @@ const HexGrid = ({ frame, config, selectedBotId, onSelectBot }) => {
       if (cell.structure) {
          drawHex(ctx, x, y, size * 0.7, null, isDark ? '#fff' : '#000', 2);
       }
+
+      // Rock
+      if (cell.rock) {
+         drawHex(ctx, x, y, size * 0.8, isDark ? '#4b5563' : '#9ca3af', isDark ? '#1f2937' : '#4b5563', 2);
+      }
+      
+      // Goal
+      if (cell.goal) {
+         drawHex(ctx, x, y, size * 0.8, 'rgba(250, 204, 21, 0.3)', '#facc15', 3);
+      }
+      
+      // Ball
+      if (cell.ball) {
+         const ballRadius = size * 0.5;
+         ctx.beginPath();
+         ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
+         ctx.fillStyle = '#d1d5db'; // light grey
+         ctx.fill();
+         ctx.strokeStyle = '#000';
+         ctx.lineWidth = 2;
+         ctx.stroke();
+         
+         // simple pentagon in center to look like a soccer ball
+         ctx.beginPath();
+         for (let i = 0; i < 5; i++) {
+           const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+           const px = x + Math.cos(angle) * (ballRadius * 0.4);
+           const py = y + Math.sin(angle) * (ballRadius * 0.4);
+           if (i === 0) ctx.moveTo(px, py);
+           else ctx.lineTo(px, py);
+         }
+         ctx.closePath();
+         ctx.fillStyle = '#1f2937'; // black
+         ctx.fill();
+
+         // lines radiating from pentagon to edge
+         ctx.beginPath();
+         for (let i = 0; i < 5; i++) {
+           const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+           const px1 = x + Math.cos(angle) * (ballRadius * 0.4);
+           const py1 = y + Math.sin(angle) * (ballRadius * 0.4);
+           const px2 = x + Math.cos(angle) * ballRadius;
+           const py2 = y + Math.sin(angle) * ballRadius;
+           ctx.moveTo(px1, py1);
+           ctx.lineTo(px2, py2);
+         }
+         ctx.strokeStyle = '#1f2937';
+         ctx.lineWidth = 1.5;
+         ctx.stroke();
+      }
     });
 
     // Draw Bots
@@ -164,6 +214,38 @@ const HexGrid = ({ frame, config, selectedBotId, onSelectBot }) => {
     });
 
     ctx.restore();
+
+    // Scoreboard for football mode
+    if (frame.board_state && frame.board_state.team_scores) {
+      const scores = frame.board_state.team_scores;
+      // Only show if the scores object exists and looks like a football match
+      if (scores.red !== undefined && scores.blue !== undefined) {
+        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(width / 2 - 100, 20, 200, 50, 10);
+        } else {
+          ctx.rect(width / 2 - 100, 20, 200, 50); // Fallback
+        }
+        ctx.fill();
+        ctx.strokeStyle = isDark ? '#334155' : '#e5e7eb';
+        ctx.stroke();
+
+        ctx.font = 'bold 24px Inter';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        ctx.fillStyle = '#ef4444';
+        ctx.fillText(`RED ${scores.red}`, width / 2 - 40, 45);
+        
+        ctx.fillStyle = '#3b82f6';
+        ctx.fillText(`${scores.blue} BLU`, width / 2 + 40, 45);
+        
+        ctx.fillStyle = isDark ? '#fff' : '#000';
+        ctx.font = 'bold 20px Inter';
+        ctx.fillText(`-`, width / 2, 45);
+      }
+    }
   }, [frame, camera, selectedBotId]);
 
   // Event Handlers

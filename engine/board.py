@@ -102,6 +102,9 @@ class Cell:
     structure: Optional[Structure] = None
     wreckage: Optional[Wreckage] = None
     occupant_id: Optional[str] = None  # bot_id of bot currently on this cell
+    rock: bool = False
+    ball: Optional[dict] = None
+    goal: bool = False
 
     @property
     def s(self) -> int:
@@ -129,6 +132,8 @@ class Cell:
             return False
         if self.structure and not self.structure.passable:
             return False
+        if self.rock or self.goal or self.ball is not None:
+            return False
         return True
 
     def is_occupied(self) -> bool:
@@ -145,6 +150,9 @@ class Cell:
             "structure": self.structure.serialize() if self.structure else None,
             "wreckage": self.wreckage.serialize() if self.wreckage else None,
             "occupant_id": self.occupant_id,
+            "rock": self.rock,
+            "ball": self.ball,
+            "goal": self.goal,
         }
 
 
@@ -160,9 +168,12 @@ class Board:
         self.storm_shrink_interval = config.get("storm_shrink_interval")
         self.current_radius = self.radius
 
+        self.team_scores = {"red": 0, "blue": 0}
+
         # cells indexed by (q, r)
         self.cells: Dict[Tuple[int, int], Cell] = {}
         self._init_cells()
+        self._init_custom_objects(config)
 
     # ── Initialisation ─────────────────────────────────────────────────────────
 
@@ -177,6 +188,33 @@ class Board:
                         terrain=Terrain.GRASS,
                         current_food=10,
                     )
+
+    def _init_custom_objects(self, config: dict):
+        """Populate rocks, balls, and goals from config, or default football layout if specified."""
+        if "rocks" in config:
+            for q, r in config["rocks"]:
+                cell = self.get_cell(q, r)
+                if cell: cell.rock = True
+        
+        if "balls" in config:
+            for q, r in config["balls"]:
+                cell = self.get_cell(q, r)
+                if cell: cell.ball = {"velocity_direction": None, "owner_id": None, "age": 0}
+        elif config.get("football_mode", False):
+            # Default ball in center
+            cell = self.get_cell(0, 0)
+            if cell: cell.ball = {"velocity_direction": None, "owner_id": None, "age": 0}
+            
+        if "goals" in config:
+            for q, r in config["goals"]:
+                cell = self.get_cell(q, r)
+                if cell: cell.goal = True
+        elif config.get("football_mode", False):
+            # Default goals on East and West edges
+            cell_w = self.get_cell(-self.radius, 0)
+            if cell_w: cell_w.goal = True
+            cell_e = self.get_cell(self.radius, 0)
+            if cell_e: cell_e.goal = True
 
     def apply_map_directive(self, directive: dict):
         """Apply Overlord map generation directives to board cells."""
@@ -271,5 +309,6 @@ class Board:
         return {
             "radius": self.radius,
             "current_radius": self.current_radius,
+            "team_scores": self.team_scores,
             "cells": {f"{q},{r}": cell.serialize() for (q, r), cell in self.cells.items()},
         }

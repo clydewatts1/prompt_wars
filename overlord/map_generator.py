@@ -64,8 +64,18 @@ class MapGenerator:
         Generate map directive via Overlord LLM then apply to board.
         Returns the directive dict for inclusion in replay.jsonl handshake.
         """
+        if "map_directive" in self.config:
+            directive = self.config["map_directive"]
+            print(f"  [Overlord] Using fixed map directive: '{directive.get('map_name', 'Custom')}'")
+            apply_directives(board, directive)
+            return directive
+
         total_cells = 3 * board.radius**2 + 3 * board.radius + 1
-        user_msg = MAP_USER_TEMPLATE.format(
+        
+        user_template = self.config.get("map_user_prompt", MAP_USER_TEMPLATE)
+        system_prompt = self.config.get("map_system_prompt", MAP_SYSTEM_PROMPT)
+
+        user_msg = user_template.format(
             num_bots=num_bots,
             radius=board.radius,
             total_cells=total_cells,
@@ -73,12 +83,12 @@ class MapGenerator:
 
         print(f"  [Overlord] Generating map for radius={board.radius}, bots={num_bots}...")
         raw = self.llm.call(
-            system_prompt=MAP_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             turn_request={"message": user_msg},
         )
 
         directive = self._parse_directive(raw, board.radius)
-        print(f"  [Overlord] Map: '{directive['map_name']}' ({directive['strategic_intent']})")
+        print(f"  [Overlord] Map: '{directive['map_name']}' ({directive.get('strategic_intent', 'unknown')})")
 
         apply_directives(board, directive)
         return directive
@@ -86,7 +96,16 @@ class MapGenerator:
     def _parse_directive(self, raw: str, radius: int) -> dict:
         """Parse LLM response. Fall back to default open map on failure."""
         try:
-            data = json.loads(raw) if raw else {}
+            cleaned = raw.strip() if raw else ""
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            elif cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.strip()
+
+            data = json.loads(cleaned) if cleaned else {}
             # Validate required fields
             if "strategic_intent" not in data or "map_name" not in data:
                 raise ValueError("Missing required fields")
@@ -253,6 +272,19 @@ def _generate_labyrinth(board: Board, directive: dict):
     _place_control_nodes(board, directive.get("control_node_count", 2))
 
 
+def _generate_symmetric_football(board: Board, directive: dict):
+    """Perfectly symmetric field: grass everywhere, forest on top/bottom edges, NO rocks."""
+    radius = board.radius
+    for cell in board.cells.values():
+        y_val = cell.r + cell.q / 2.0
+        if abs(y_val) >= radius * 0.6:
+            cell.terrain = Terrain.FOREST
+            cell.current_food = random.randint(10, 20)
+        else:
+            cell.terrain = Terrain.GRASS
+            cell.current_food = random.randint(5, 15)
+
+
 # ── Shared helpers ─────────────────────────────────────────────────────────────
 
 def _fill_remaining_grass(board: Board):
@@ -300,4 +332,5 @@ INTENT_GENERATORS = {
     "contested":  _generate_contested,
     "asymmetric": _generate_asymmetric,
     "labyrinth":  _generate_labyrinth,
+    "symmetric_football": _generate_symmetric_football,
 }

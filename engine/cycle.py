@@ -14,7 +14,7 @@ from engine.actions import ActionResolver
 from engine.peek import PeekResolver
 from engine.win import WinChecker
 from engine.writer import StateWriter
-from llm.ollama import OllamaClient
+from llm import get_llm_client
 from llm.prompts import build_handshake, build_turn_request
 from overlord.map_generator import MapGenerator
 from overlord.evaluator import OverlordEvaluator
@@ -50,10 +50,10 @@ class GameEngine:
         self.writer     = StateWriter(replay_path)
 
         # LLM
-        self.llm = OllamaClient(config["llm"], verbose=self.verbose, trace_path=self.trace_path)
+        self.llm = get_llm_client(config["llm"], verbose=self.verbose, trace_path=self.trace_path)
 
-        # Overlord — use same Ollama client with different temperature
-        overlord_llm = OllamaClient({**config["llm"], **config["overlord"]}, verbose=self.verbose, trace_path=self.trace_path)
+        # Overlord — use same factory client with different config parameters
+        overlord_llm = get_llm_client({**config["llm"], **config["overlord"]}, verbose=self.verbose, trace_path=self.trace_path)
         self.map_gen   = MapGenerator(overlord_llm, config["overlord"])
         self.evaluator = OverlordEvaluator(overlord_llm, config["overlord"])
 
@@ -248,6 +248,9 @@ class GameEngine:
         # Passive income
         self.board.distribute_passive_income(self.bots)
 
+        # Ball Physics
+        self._resolve_ball_physics()
+
         # Storm ring (if enabled)
         self.board.apply_storm(self.cycle)
 
@@ -257,15 +260,18 @@ class GameEngine:
     # ── Bot initialisation ─────────────────────────────────────────────────────
 
     def _init_bots(self, bot_configs: list, radius: int) -> list:
-        """Spawn bots evenly distributed around inner ring."""
+        """Spawn bots evenly distributed around inner ring or at custom coordinates."""
         bots = []
         spawn_radius = max(2, radius - 2)
         n = len(bot_configs)
 
         for i, cfg in enumerate(bot_configs):
-            angle = (2 * math.pi * i) / n
-            q = round(spawn_radius * math.cos(angle))
-            r = round(spawn_radius * math.sin(angle))
+            if "q" in cfg and "r" in cfg:
+                q, r = cfg["q"], cfg["r"]
+            else:
+                angle = (2 * math.pi * i) / n
+                q = round(spawn_radius * math.cos(angle))
+                r = round(spawn_radius * math.sin(angle))
 
             # Snap to valid cell
             cell = self.board.get_cell(q, r)
@@ -294,3 +300,82 @@ class GameEngine:
     def _log(self, msg: str):
         if self.verbose:
             print(msg)
+
+    # ── Football Physics ───────────────────────────────────────────────────────
+
+    def _resolve_ball_physics(self):
+        balls_to_process = []
+        for (q, r), cell in self.board.cells.items():
+            if cell.ball is not None:
+                balls_to_process.append((q, r, cell))
+
+        for q, r, cell in balls_to_process:
+            ball = cell.ball
+            if ball["velocity_direction"] is None:
+                continue
+
+            # check age
+            ball["age"] += 1
+            if ball["age"] > self.board.radius * 2:
+                ball["velocity_direction"] = None
+                continue
+
+            direction = ball["velocity_direction"]
+            from engine.board import DIRECTIONS
+            dq, dr = DIRECTIONS[direction]
+            nq, nr = q + dq, r + dr
+
+            target = self.board.get_cell(nq, nr)
+            if not target:
+                # hit wall, bounce
+                ball["velocity_direction"] = self._reverse_direction(direction)
+                continue
+
+            if target.goal:
+                # Goal scored!
+                owner = next((b for b in self.bots if b.bot_id == ball["owner_id"]), None)
+                if owner and owner.is_alive:
+                    owner.add_compute(30)
+                    self._log(f"  GOAL by {owner.name} (+30 CU)!")
+                    if owner.team in self.board.team_scores:
+                        self.board.team_scores[owner.team] += 1
+                
+                # Reset ball
+                cell.ball = None
+                self._reset_ball()
+                continue
+            
+            if not target.is_passable():
+                # hit object, bounce
+                if target.occupant_id:
+                    ball["owner_id"] = target.occupant_id
+                    ball["age"] = 0
+                ball["velocity_direction"] = self._reverse_direction(direction)
+                continue
+
+            # Move ball
+            target.ball = ball
+            cell.ball = None
+
+    def _reverse_direction(self, direction: str) -> str:
+        rev = {
+            "east": "west",
+            "south_east": "north_west",
+            "south_west": "north_east",
+            "west": "east",
+            "north_west": "south_east",
+            "north_east": "south_west"
+        }
+        return rev.get(direction, "west")
+
+    def _reset_ball(self):
+        candidates = []
+        for (q, r), cell in self.board.cells.items():
+            if cell.is_passable():
+                dist = (abs(q) + abs(q + r) + abs(r)) // 2
+                candidates.append((dist, q, r, cell))
+        
+        if candidates:
+            candidates.sort(key=lambda x: x[0])
+            best_cell = candidates[0][3]
+            best_cell.ball = {"velocity_direction": None, "owner_id": None, "age": 0}
