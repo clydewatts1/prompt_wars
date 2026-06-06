@@ -54,6 +54,9 @@ class PeekResolver:
                 "structure": cell.structure.serialize() if cell.structure else None,
                 "wreckage": cell.wreckage.serialize() if cell.wreckage else None,
                 "occupant": self._serialize_occupant(occupant) if occupant else None,
+                "rock": cell.rock,
+                "ball": cell.ball,
+                "goal": cell.goal,
                 "ray_blocked_here": False,
             }
 

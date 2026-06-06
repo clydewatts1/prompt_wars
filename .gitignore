@@ -33,3 +33,12 @@ Desktop.ini
 *.jsonl
 output/
 replay.jsonl
+
+# Any *.pyc files
+*.pyc
+*.pyc.*
+# Any *.pkl files
+*cpython*
+__pycache__/
+*.pyo
+trace.yaml

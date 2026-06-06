@@ -89,7 +89,11 @@ class Validator:
                               "action_attempted": action}
 
         # Memory overflow check
-        save_memory = data.get("save_memory", "")
+        save_memory = data.get("save_memory")
+        if save_memory is None:
+            save_memory = ""
+        elif not isinstance(save_memory, str):
+            save_memory = str(save_memory)
         if len(save_memory) > self.memory_max:
             return None, {
                 "reason": "memory_overflow",

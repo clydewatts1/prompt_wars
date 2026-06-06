@@ -106,6 +106,7 @@ def _serialize_current_cell(cell) -> dict:
     if not cell:
         return {}
     return {
+        "coordinate": {"q": cell.q, "r": cell.r},
         "terrain": cell.terrain.value,
         "food": cell.current_food,
         "max_food": cell.max_food,
