@@ -64,6 +64,21 @@ class MapGenerator:
         Generate map directive via Overlord LLM then apply to board.
         Returns the directive dict for inclusion in replay.jsonl handshake.
         """
+        # If board already contains goals, this is a football match.
+        # Bypass Overlord LLM map generation to guarantee a clean, perfectly symmetric pitch without obstacles.
+        if any(cell.goal for cell in board.cells.values()):
+            directive = {
+                "map_name": "Football Stadium",
+                "description": "A perfectly symmetric grassy pitch with forest boundaries.",
+                "strategic_intent": "symmetric_football",
+                "directives": [],
+                "food_distribution": "spread",
+                "control_node_count": 0,
+            }
+            print(f"  [Overlord] Football mode detected (goals exist on board). Skipping LLM map generation and applying symmetric football pitch.")
+            apply_directives(board, directive)
+            return directive
+
         if "map_directive" in self.config:
             directive = self.config["map_directive"]
             print(f"  [Overlord] Using fixed map directive: '{directive.get('map_name', 'Custom')}'")
@@ -275,9 +290,9 @@ def _generate_labyrinth(board: Board, directive: dict):
 def _generate_symmetric_football(board: Board, directive: dict):
     """Perfectly symmetric field: grass everywhere, forest on top/bottom edges, NO rocks."""
     radius = board.radius
+    threshold = max(2, radius - 3)
     for cell in board.cells.values():
-        y_val = cell.r + cell.q / 2.0
-        if abs(y_val) >= radius * 0.6:
+        if abs(cell.r) >= threshold:
             cell.terrain = Terrain.FOREST
             cell.current_food = random.randint(10, 20)
         else:

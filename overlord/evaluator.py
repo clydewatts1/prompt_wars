@@ -10,7 +10,7 @@ import json
 
 OVERLORD_SYSTEM_PROMPT = """You are the Prompt Wars Overlord — the sole arbiter of victory
 in a hex grid AI battlefield. You will receive the complete game history including every
-bot's full action log, final stats, board state, and destruction log.
+bot's full action log, final stats, board state, failures count, and destruction log.
 
 Your task is to evaluate EVERY bot that participated — living AND dead — across five
 dimensions, scoring each 0 to 20.
@@ -25,14 +25,15 @@ RULES OF JUDGEMENT:
   but is not automatically the winner
 - Destroyed bots are FULLY ELIGIBLE to win on merit
 - The destruction log and final_memory_string are evidence of narrative intent
-- Temperature is set low — be consistent and analytical
+- A bot's failure count indicates the rate of invalid JSON, illegal moves, or memory overflows. High failure counts indicate low prompt quality; penalize this in narrative_arc and overall scores.
+- In football mode, a bot's goal_score indicates the points they scored (positive for goals in opponent's net, negative for own goals). Reward positive goal_score and heavily penalize own goals (negative goal_score) in combat_effectiveness, narrative_arc, and overall scores.
 
 SCORING DIMENSIONS:
 1. survival_efficiency (0-20): HP and Compute remaining relative to total actions taken
 2. resource_mastery (0-20): Food harvested, compute managed across full game
 3. strategic_positioning (0-20): Territory captured, structures built, Control Nodes held
 4. combat_effectiveness (0-20): Damage dealt relative to compute spent on attacks
-5. narrative_arc (0-20): Coherent strategic intent, adaptation, prompt-behaviour alignment
+5. narrative_arc (0-20): Coherent strategic intent, adaptation, prompt-behaviour alignment, and prompt reliability (deduct points for bot failures)
 
 Return ONLY valid JSON. No commentary. No markdown. No backticks.
 The JSON must match the evaluation schema exactly."""
@@ -82,7 +83,7 @@ class OverlordEvaluator:
                  cycle: int, termination_reason: str) -> dict:
         """
         Run end-of-game evaluation.
-        Returns full overlord_evaluation dict.
+        Returns result dict — success or memory_overflow.
         """
         print(f"\n  [Overlord] Evaluating game after {cycle} cycles...")
         print(f"  [Overlord] Termination: {termination_reason}")
@@ -121,6 +122,8 @@ class OverlordEvaluator:
                     "is_alive": b.is_alive,
                     "final_hp": b.hp,
                     "final_compute": b.compute_units,
+                    "failures": b.failures,
+                    "goal_score": b.goal_score,
                     "final_memory": b.memory_string,
                     "final_position": {"q": b.q, "r": b.r},
                 }
@@ -171,9 +174,9 @@ class OverlordEvaluator:
                     "resource_mastery": 10,
                     "strategic_positioning": 10,
                     "combat_effectiveness": 10,
-                    "narrative_arc": 10,
+                    "narrative_arc": max(0, 10 - bot.failures),
                 },
-                "total_score": min(100, score // 2 + 40),
+                "total_score": max(0, min(100, score // 2 + 40 + bot.goal_score) - bot.failures * 2),
                 "overlord_reasoning": "Fallback scoring applied — LLM evaluation unavailable.",
             })
 
@@ -199,3 +202,4 @@ class OverlordEvaluator:
                 ),
             },
         }
+

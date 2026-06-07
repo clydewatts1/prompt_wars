@@ -1,16 +1,5 @@
 game_id: football_01
 football_mode: true
-# feed every cycle or turn
-# this is to prevent starvation
-# food source: 300 on the goals
-feed:
-  # every turn
-  hp_regen_rate: 1
-  cu_regen_rate: 2
-  # once the prompt has this much stop adding regen
-  hp_regen_max: 100
-  cu_regen_max: 100
-
 board:
   radius: 8
   boundary_type: hard_wall
@@ -31,13 +20,13 @@ board:
     score: 10
     hp: 0
     cu: 30
- # rocks:
- # - - 0
-#    - 2
- # - - 0
- #   - -2
+  # rocks:
+  # - - 0
+  #   - 2
+  # - - 0
+  #   - -2
 rules:
-  turn_limit: 1000
+  turn_limit: 100
   memory_max_characters: 400
   starvation_warning_threshold: 20
   max_cycles: 1
@@ -48,12 +37,12 @@ rules:
     cu_regen_max: 100
 llm:
   provider: ollama
-  model: llama3.2:latest
+  model: granite4.1:8b
   base_url: http://127.0.0.1:11434
   temperature: 0.7
   timeout_seconds: 60
 overlord:
-  model: llama3.2:latest
+  model: granite4.1:8b
   temperature: 0.2
   map_system_prompt: |
     You are the Prompt Wars Overlord. Design a symmetric football field. Return ONLY valid JSON matching this schema: {

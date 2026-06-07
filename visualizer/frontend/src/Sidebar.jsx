@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Sidebar = ({ frame, replay, selectedBotId, config }) => {
+const Sidebar = ({ frame, replay, selectedBotId, config, onSelectBot }) => {
   if (!frame) return <div className="sidebar"></div>;
 
   const bot = frame.bot_states.find(b => b.bot_id === selectedBotId) || frame.bot_states[0];
@@ -13,8 +13,74 @@ const Sidebar = ({ frame, replay, selectedBotId, config }) => {
                     config?.bots?.find(b => b.name?.toLowerCase() === bot.name?.toLowerCase());
   const systemPrompt = botConfig ? botConfig.system_prompt : '';
 
+  // Extract team failures
+  const teamFailures = {};
+  frame.bot_states.forEach(b => {
+    if (b.failures) {
+      teamFailures[b.team] = (teamFailures[b.team] || 0) + b.failures;
+    }
+  });
+
   return (
     <div className="sidebar">
+      {/* Active Bots Grid Selector */}
+      <div className="panel-section">
+        <div className="panel-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Active Bots</span>
+          {Object.keys(teamFailures).length > 0 && (
+            <span style={{ fontSize: '11px', textTransform: 'none', letterSpacing: 'normal', color: 'var(--text-muted)' }}>
+              Failures: {Object.entries(teamFailures).map(([team, count], idx) => (
+                <span key={team}>
+                  {idx > 0 && ' • '}
+                  <span style={{ color: team === 'red' ? '#ef4444' : team === 'blue' ? '#3b82f6' : 'inherit', fontWeight: 'bold' }}>
+                    {team.toUpperCase()} {count}
+                  </span>
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
+        <div className="bots-grid">
+          {frame.bot_states.map(b => {
+            const isSelected = b.bot_id === bot.bot_id;
+            return (
+              <div 
+                key={b.bot_id} 
+                className={`bot-select-card ${b.team} ${isSelected ? 'selected' : ''}`}
+                onClick={() => onSelectBot && onSelectBot(b.bot_id)}
+              >
+                <div className="bot-select-header">
+                  <span className="bot-select-name">{b.name}</span>
+                  <span className={`status-dot ${b.is_alive ? 'alive' : 'dead'}`}></span>
+                </div>
+                {b.is_alive ? (
+                  <div className="bot-select-stats" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    <span className="stat-pill hp">HP {b.hp}</span>
+                    <span className="stat-pill compute">CU {b.compute_units}</span>
+                    {b.goal_score !== undefined && b.goal_score !== 0 && (
+                      <span className="stat-pill goals" style={{ backgroundColor: b.goal_score > 0 ? '#059669' : '#ef4444', color: '#fff' }}>PTS {b.goal_score}</span>
+                    )}
+                    {b.failures !== undefined && b.failures > 0 && (
+                      <span className="stat-pill failures" style={{ backgroundColor: '#ef4444' }}>FAIL {b.failures}</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bot-select-stats" style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                    <span className="dead-label">ELIMINATED</span>
+                    {b.goal_score !== undefined && b.goal_score !== 0 && (
+                      <span className="stat-pill goals" style={{ backgroundColor: b.goal_score > 0 ? '#059669' : '#ef4444', color: '#fff', fontSize: '9px', padding: '1px 4px' }}>PTS {b.goal_score}</span>
+                    )}
+                    {b.failures !== undefined && b.failures > 0 && (
+                      <span className="stat-pill failures" style={{ backgroundColor: '#ef4444', fontSize: '9px', padding: '1px 4px' }}>FAIL {b.failures}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="panel-section">
         <div className="bot-card">
           <div className="bot-header">
@@ -68,6 +134,34 @@ const Sidebar = ({ frame, replay, selectedBotId, config }) => {
             </div>
           </div>
 
+          <div className="progress-container" style={{ marginTop: '14px' }}>
+            <div className="progress-header">
+              <span>Failed Prompts</span>
+              <span style={{ color: (bot.failures || 0) > 0 ? '#ef4444' : 'inherit', fontWeight: 'bold' }}>
+                {bot.failures !== undefined ? bot.failures : 0}
+              </span>
+            </div>
+            {(bot.failures || 0) > 0 && (
+              <div className="progress-bar-bg">
+                <div 
+                  className="progress-bar-fill failures" 
+                  style={{ width: `${Math.min(100, ((bot.failures || 0) / 10) * 100)}%`, backgroundColor: '#ef4444' }}
+                ></div>
+              </div>
+            )}
+          </div>
+
+          {bot.goal_score !== undefined && (
+            <div className="progress-container" style={{ marginTop: '14px' }}>
+              <div className="progress-header">
+                <span>Goal Points</span>
+                <span style={{ color: bot.goal_score > 0 ? '#10b981' : (bot.goal_score < 0 ? '#ef4444' : 'inherit'), fontWeight: 'bold' }}>
+                  {bot.goal_score}
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="panel-title" style={{marginTop: '20px'}}>Memory</div>
           <div className="memory-box">
             {bot.memory_string || 'Memory core empty...'}
@@ -80,15 +174,15 @@ const Sidebar = ({ frame, replay, selectedBotId, config }) => {
         <div style={{overflowY: 'auto', flex: 1, paddingRight: '10px'}}>
           {pastCycles.map((cyc) => {
              const bState = cyc.bot_states.find(b => b.bot_id === bot.bot_id);
-             // We want to show the turn result of this cycle if it exists, but the LLM reasoning isn't explicitly saved in replay unless it's in last_turn_result.
-             // Usually, replay.jsonl has the raw LLM response or we just show the action.
              const action = bState?.last_turn_result?.action_attempted || 'None';
              const deduct = bState?.last_turn_result?.compute_deducted || 0;
              const status = bState?.last_turn_result?.status || '';
+             const thought = bState?.last_turn_result?.thought || '';
 
              return (
                <div key={cyc.cycle_id} className={`react-log-item ${bot.team}`}>
                  <div className="log-meta">Cycle {cyc.cycle_id} • {bot.name}</div>
+                 {thought && <div className="log-thought">"{thought}"</div>}
                  <div className="log-action">
                     {action} • cost {deduct} CU • {status}
                  </div>

@@ -94,7 +94,19 @@ class GameEngine:
                 self.destruction_log, win_result
             )
 
+            if not self.verbose:
+                import sys
+                limit = self.config["rules"]["turn_limit"]
+                pct = int((self.cycle / limit) * 100) if limit > 0 else 0
+                bar_len = 20
+                filled_len = int(bar_len * self.cycle / limit) if limit > 0 else 0
+                bar = '=' * filled_len + '-' * (bar_len - filled_len)
+                sys.stdout.write(f"\r  Simulating Cycle {self.cycle}/{limit} [{bar}] {pct}%")
+                sys.stdout.flush()
+
             if win_result["game_over"]:
+                if not self.verbose:
+                    print()
                 print(f"\n  Game over - {win_result['termination_reason']}")
                 verdict = self.evaluator.evaluate(
                     self.board, self.bots, self.destruction_log,
@@ -109,6 +121,8 @@ class GameEngine:
                 print(f"  Verdict: {winner.get('verdict', '')}")
                 break
 
+        if not self.verbose:
+            print()
         print(f"\n=== GAME COMPLETE after {self.cycle} cycles ===\n")
 
     # ── Phase 1 ────────────────────────────────────────────────────────────────
@@ -184,6 +198,7 @@ class GameEngine:
                         **mem_result,
                         "action_attempted": action["action"],
                         "compute_deducted": 0,
+                        "thought": action.get("thought", ""),
                     })
                     self._log(f"  [{bot.name}] MEMORY OVERFLOW ({mem_result['characters_submitted']} chars)")
                     continue
@@ -199,6 +214,7 @@ class GameEngine:
                 bot.record_last_turn_result("success", {
                     "action": "peek",
                     "compute_deducted": 1,
+                    "thought": action.get("thought", ""),
                 })
                 self._log(f"  [{bot.name}] PEEK {action['direction']} (queued)")
                 continue
@@ -208,6 +224,7 @@ class GameEngine:
             if not valid:
                 self._log(f"  [{bot.name}] ILLEGAL ({val_error['detail']})")
                 bot.deduct_compute(val_error.get("compute_deducted", 0))
+                val_error["thought"] = action.get("thought", "")
                 bot.record_last_turn_result("failed", val_error)
                 continue
 
@@ -219,6 +236,7 @@ class GameEngine:
             bot.record_last_turn_result("success", {
                 "action": action["action"],
                 "compute_deducted": cost,
+                "thought": action.get("thought", ""),
             })
             self._log(f"  [{bot.name}] {action['action'].upper()} (cost:{cost} CU remaining:{bot.compute_units})")
 
@@ -247,6 +265,9 @@ class GameEngine:
 
         # Passive income
         self.board.distribute_passive_income(self.bots)
+
+        # Apply feed / regen
+        self._apply_feed_regen()
 
         # Ball Physics
         self._resolve_ball_physics()
@@ -333,12 +354,31 @@ class GameEngine:
 
             if target.goal:
                 # Goal scored!
+                # Determine which team defends this goal
+                defending_team = target.goal_owner
+                if not defending_team:
+                    defending_team = "red" if target.q < 0 else ("blue" if target.q > 0 else None)
+                
+                # Scoring team is the opponent of the defending team
+                scoring_team = "blue" if defending_team == "red" else ("red" if defending_team == "blue" else None)
+                
+                if scoring_team and scoring_team in self.board.team_scores:
+                    self.board.team_scores[scoring_team] += 1
+                
                 owner = next((b for b in self.bots if b.bot_id == ball["owner_id"]), None)
                 if owner and owner.is_alive:
-                    owner.add_compute(30)
-                    self._log(f"  GOAL by {owner.name} (+30 CU)!")
-                    if owner.team in self.board.team_scores:
-                        self.board.team_scores[owner.team] += 1
+                    if owner.team == scoring_team:
+                        # Regular Goal
+                        owner.goal_score += target.goal_score
+                        owner.add_compute(target.goal_cu)
+                        owner.hp = min(owner.max_hp, owner.hp + target.goal_hp)
+                        self._log(f"  GOAL by {owner.name} (+{target.goal_cu} CU, +{target.goal_hp} HP, +{target.goal_score} pts)!")
+                    else:
+                        # Own Goal
+                        owner.goal_score -= target.goal_score
+                        self._log(f"  OWN GOAL by {owner.name} (-{target.goal_score} pts)!")
+                else:
+                    self._log(f"  GOAL scored for team {scoring_team}!")
                 
                 # Reset ball
                 cell.ball = None
@@ -379,3 +419,33 @@ class GameEngine:
             candidates.sort(key=lambda x: x[0])
             best_cell = candidates[0][3]
             best_cell.ball = {"velocity_direction": None, "owner_id": None, "age": 0}
+
+    def _apply_feed_regen(self):
+        feed_cfg = self.config.get("rules", {}).get("feed") or self.config.get("feed")
+        if not feed_cfg:
+            return
+        
+        hp_rate = feed_cfg.get("hp_regen_rate", 0)
+        cu_rate = feed_cfg.get("cu_regen_rate", 0)
+        hp_max  = feed_cfg.get("hp_regen_max", 100)
+        cu_max  = feed_cfg.get("cu_regen_max", 100)
+        
+        if hp_rate <= 0 and cu_rate <= 0:
+            return
+            
+        self._log(f"  Phase 2: applying feed regeneration (HP rate: {hp_rate}, CU rate: {cu_rate})")
+        for bot in self.bots:
+            if bot.is_alive:
+                # Regulate HP
+                if hp_rate > 0 and bot.hp < hp_max:
+                    old_hp = bot.hp
+                    bot.hp = min(hp_max, bot.hp + hp_rate)
+                    if bot.hp != old_hp:
+                        self._log(f"    [{bot.name}] Regenerated HP: {old_hp} -> {bot.hp}")
+                
+                # Regulate CU
+                if cu_rate > 0 and bot.compute_units < cu_max:
+                    old_cu = bot.compute_units
+                    bot.compute_units = min(cu_max, bot.compute_units + cu_rate)
+                    if bot.compute_units != old_cu:
+                        self._log(f"    [{bot.name}] Regenerated CU: {old_cu} -> {bot.compute_units}")

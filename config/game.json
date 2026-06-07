@@ -1,1 +1,41 @@
-{"game_id": "game_001", "board": {"radius": 10, "boundary_type": "hard_wall", "storm_enabled": false, "storm_start_cycle": null, "storm_shrink_interval": null}, "rules": {"turn_limit": 100, "memory_max_characters": 400, "starvation_warning_threshold": 10, "max_cycles": 1}, "llm": {"provider": "ollama", "model": "llama3.2:latest", "base_url": "http://127.0.0.1:11434", "temperature": 0.7, "timeout_seconds": 60}, "overlord": {"model": "llama3.2:latest", "temperature": 0.2}, "bots": [{"bot_id": "bot_01", "name": "Bramble-Forager", "team": "red", "system_prompt": "You are Bramble-Forager, a cautious AI agent on a hex grid battlefield. Stay hidden in forest terrain, harvest food to maintain compute, and build barricades for defence. Only attack enemies when you have compute advantage. Always write concise memory under 400 characters tracking your goal, nearest enemy, and resource status."}, {"bot_id": "bot_02", "name": "Hunter-X", "team": "blue", "system_prompt": "You are Hunter-X, an aggressive AI agent on a hex grid battlefield. Hunt enemies relentlessly. Use peek to gather intelligence before attacking. Prioritise eliminating enemies over resource gathering. Always write concise memory under 400 characters tracking enemy positions and your attack plans."}]}
+{
+  "game_id": "game_001",
+  "board": {
+    "radius": 10,
+    "boundary_type": "hard_wall",
+    "storm_enabled": false,
+    "storm_start_cycle": null,
+    "storm_shrink_interval": null
+  },
+  "rules": {
+    "turn_limit": 100,
+    "memory_max_characters": 400,
+    "starvation_warning_threshold": 10,
+    "max_cycles": 1
+  },
+  "llm": {
+    "provider": "ollama",
+    "model": "llama3.2:latest",
+    "base_url": "http://127.0.0.1:11434",
+    "temperature": 0.7,
+    "timeout_seconds": 60
+  },
+  "overlord": {
+    "model": "llama3.2:latest",
+    "temperature": 0.2
+  },
+  "bots": [
+    {
+      "bot_id": "bot_01",
+      "file": "config/bots/bramble_forager.yaml",
+      "name": "Bramble-Forager",
+      "team": "red"
+    },
+    {
+      "bot_id": "bot_02",
+      "file": "config/bots/hunter_x.yaml",
+      "name": "Hunter-X",
+      "team": "blue"
+    }
+  ]
+}

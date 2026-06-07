@@ -16,6 +16,8 @@ class StateWriter:
     def __init__(self, path: str):
         self.path = path
         self.records = []
+        self.start_time = datetime.now()
+        self.start_time_str = self.start_time.strftime("%y-%m-%d %H:%M")
         # Clear file on start
         with open(path, "w", encoding="utf-8") as f:
             pass
@@ -37,6 +39,7 @@ class StateWriter:
         self._append({
             "type": "handshake",
             "timestamp": datetime.utcnow().isoformat(),
+            "start_time": self.start_time_str,
             "protocol_version": "1.7",
             "config": config,
             "handshake": handshake,
@@ -51,9 +54,18 @@ class StateWriter:
     def write_cycle(self, cycle_id: int, board: Board, bots: list,
                      destruction_log: list, win_check: dict):
         """Written after every Phase 2."""
+        now = datetime.now()
+        duration_seconds = int((now - self.start_time).total_seconds())
+        hours = duration_seconds // 3600
+        minutes = (duration_seconds % 3600) // 60
+        elapsed_duration = f"{hours:02d}:{minutes:02d}"
+
         self._append({
             "type": "cycle",
             "cycle_id": cycle_id,
+            "start_time": self.start_time_str,
+            "current_time": now.strftime("%y-%m-%d %H:%M"),
+            "elapsed_duration": elapsed_duration,
             "board_state": board.serialize(),
             "bot_states": [b.serialize() for b in bots],
             "destruction_log": destruction_log,
@@ -66,9 +78,18 @@ class StateWriter:
 
     def write_finale(self, win_check: dict, verdict: dict):
         """Written once at game end."""
+        now = datetime.now()
+        duration_seconds = int((now - self.start_time).total_seconds())
+        hours = duration_seconds // 3600
+        minutes = (duration_seconds % 3600) // 60
+        duration_str = f"{hours:02d}:{minutes:02d}"
+
         self._append({
             "type": "finale",
             "timestamp": datetime.utcnow().isoformat(),
+            "start_time": self.start_time_str,
+            "end_time": now.strftime("%y-%m-%d %H:%M"),
+            "duration": duration_str,
             "termination_reason": win_check["termination_reason"],
             "cycle_terminated": win_check["cycle"],
             "survivors": win_check.get("survivors", []),

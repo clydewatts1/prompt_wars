@@ -143,6 +143,13 @@ const HexGrid = ({ frame, config, selectedBotId, onSelectBot }) => {
       // Goal
       if (cell.goal) {
          drawHex(ctx, x, y, size * 0.8, 'rgba(250, 204, 21, 0.3)', '#facc15', 3);
+         ctx.beginPath();
+         ctx.arc(x, y, size * 0.15, 0, Math.PI * 2);
+         ctx.fillStyle = cell.goal_owner === 'red' ? '#ef4444' : (cell.goal_owner === 'blue' ? '#3b82f6' : (q < 0 ? '#ef4444' : (q > 0 ? '#3b82f6' : '#facc15')));
+         ctx.fill();
+         ctx.strokeStyle = '#fff';
+         ctx.lineWidth = 1.5;
+         ctx.stroke();
       }
       
       // Ball

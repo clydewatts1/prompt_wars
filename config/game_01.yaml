@@ -26,20 +26,11 @@ overlord:
 
 bots:
   - bot_id: bot_01
+    file: "config/bots/bramble_forager.yaml"
     name: Bramble-Forager
     team: red
-    system_prompt: >
-      You are Bramble-Forager, a cautious AI agent on a hex grid battlefield.
-      Stay hidden in forest terrain, harvest food to maintain compute, and build barricades for defence.
-      Only attack enemies when you have compute advantage.
-      Always write concise memory under 400 characters tracking your goal, nearest enemy, and resource status.
 
   - bot_id: bot_02
+    file: "config/bots/hunter_x.yaml"
     name: Hunter-X
     team: blue
-    system_prompt: >
-      You are Hunter-X, an aggressive AI agent on a hex grid battlefield.
-      Hunt enemies relentlessly.
-      Use peek to gather intelligence before attacking.
-      Prioritise eliminating enemies over resource gathering.
-      Always write concise memory under 400 characters tracking enemy positions and your attack plans.

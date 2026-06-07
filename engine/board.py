@@ -105,6 +105,10 @@ class Cell:
     rock: bool = False
     ball: Optional[dict] = None
     goal: bool = False
+    goal_owner: Optional[str] = None
+    goal_score: int = 0
+    goal_hp: int = 0
+    goal_cu: int = 0
 
     @property
     def s(self) -> int:
@@ -153,6 +157,10 @@ class Cell:
             "rock": self.rock,
             "ball": self.ball,
             "goal": self.goal,
+            "goal_owner": self.goal_owner,
+            "goal_score": self.goal_score,
+            "goal_hp": self.goal_hp,
+            "goal_cu": self.goal_cu,
         }
 
 
@@ -206,15 +214,47 @@ class Board:
             if cell: cell.ball = {"velocity_direction": None, "owner_id": None, "age": 0}
             
         if "goals" in config:
-            for q, r in config["goals"]:
-                cell = self.get_cell(q, r)
-                if cell: cell.goal = True
+            for item in config["goals"]:
+                if isinstance(item, dict):
+                    team = item.get("team")
+                    coord = item.get("coordinate")
+                    score = item.get("score", 10)
+                    hp_reward = item.get("hp", 0)
+                    cu_reward = item.get("cu", 30)
+                    if coord and len(coord) == 2:
+                        q, r = coord
+                        cell = self.get_cell(q, r)
+                        if cell:
+                            cell.goal = True
+                            cell.goal_owner = team
+                            cell.goal_score = score
+                            cell.goal_hp = hp_reward
+                            cell.goal_cu = cu_reward
+                elif isinstance(item, (list, tuple)) and len(item) == 2:
+                    q, r = item
+                    cell = self.get_cell(q, r)
+                    if cell:
+                        cell.goal = True
+                        cell.goal_owner = "red" if q < 0 else ("blue" if q > 0 else None)
+                        cell.goal_score = 10
+                        cell.goal_hp = 0
+                        cell.goal_cu = 30
         elif config.get("football_mode", False):
             # Default goals on East and West edges
             cell_w = self.get_cell(-self.radius, 0)
-            if cell_w: cell_w.goal = True
+            if cell_w:
+                cell_w.goal = True
+                cell_w.goal_owner = "red"
+                cell_w.goal_score = 10
+                cell_w.goal_hp = 0
+                cell_w.goal_cu = 30
             cell_e = self.get_cell(self.radius, 0)
-            if cell_e: cell_e.goal = True
+            if cell_e:
+                cell_e.goal = True
+                cell_e.goal_owner = "blue"
+                cell_e.goal_score = 10
+                cell_e.goal_hp = 0
+                cell_e.goal_cu = 30
 
     def apply_map_directive(self, directive: dict):
         """Apply Overlord map generation directives to board cells."""

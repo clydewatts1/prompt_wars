@@ -35,6 +35,8 @@ class Bot:
     # State
     is_alive: bool = True
     status_effects: list = field(default_factory=list)
+    failures: int = 0
+    goal_score: int = 0
 
     # Turn tracking
     last_turn_result: dict = field(default_factory=lambda: {
@@ -46,6 +48,7 @@ class Bot:
         "characters_submitted": None,
         "characters_allowed": None,
         "attempted_save_memory": None,
+        "thought": None,
     })
     pending_peek_result: Optional[dict] = None
 
@@ -106,8 +109,10 @@ class Bot:
                 "characters_submitted": None,
                 "characters_allowed": None,
                 "attempted_save_memory": None,
+                "thought": data.get("thought"),
             }
         else:
+            self.failures += 1
             self.last_turn_result = {
                 "status": "failed",
                 "reason": data.get("reason"),
@@ -117,6 +122,7 @@ class Bot:
                 "characters_submitted": data.get("characters_submitted"),
                 "characters_allowed": data.get("characters_allowed"),
                 "attempted_save_memory": data.get("attempted_save_memory"),
+                "thought": data.get("thought"),
             }
 
     # ── Death ──────────────────────────────────────────────────────────────────
@@ -176,4 +182,6 @@ class Bot:
             "is_alive": self.is_alive,
             "last_turn_result": self.last_turn_result,
             "status_effects": self.status_effects,
+            "failures": self.failures,
+            "goal_score": self.goal_score,
         }

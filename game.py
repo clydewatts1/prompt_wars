@@ -82,6 +82,38 @@ Examples:
                 config = yaml.safe_load(f)
             else:
                 config = json.load(f)
+        
+        # Load and merge external bot configs if specified
+        if "bots" in config and isinstance(config["bots"], list):
+            config_dir = os.path.dirname(os.path.abspath(args.config))
+            for i, bot_entry in enumerate(config["bots"]):
+                if isinstance(bot_entry, dict) and "file" in bot_entry:
+                    bot_file = bot_entry["file"]
+                    path1 = os.path.join(config_dir, bot_file)
+                    path2 = os.path.join(os.path.dirname(config_dir), bot_file)
+                    path3 = os.path.abspath(bot_file)
+                    
+                    target_path = None
+                    for p in [path1, path2, path3]:
+                        if os.path.exists(p):
+                            target_path = p
+                            break
+                    if not target_path:
+                        print(f"Error: bot config file not found: {bot_file}")
+                        sys.exit(1)
+                        
+                    with open(target_path, "r", encoding="utf-8") as bf:
+                        _, b_ext = os.path.splitext(target_path.lower())
+                        if b_ext in ('.yaml', '.yml'):
+                            import yaml
+                            bot_data = yaml.safe_load(bf)
+                        else:
+                            bot_data = json.load(bf)
+                    
+                    # Merge: bot_entry overrides bot_data
+                    merged_bot = bot_data.copy()
+                    merged_bot.update(bot_entry)
+                    config["bots"][i] = merged_bot
     except FileNotFoundError:
         print(f"Error: config file not found: {args.config}")
         sys.exit(1)

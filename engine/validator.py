@@ -64,29 +64,31 @@ class Validator:
             return None, {"reason": "invalid_json", "compute_deducted": 0,
                           "action_attempted": None}
 
+        thought = data.get("thought", "")
+
         action = data.get("action")
         if action not in VALID_ACTIONS:
             return None, {"reason": "invalid_json", "compute_deducted": 0,
-                          "action_attempted": None}
+                          "action_attempted": None, "thought": thought}
 
         # Direction required for directional actions
         if action in ["move", "attack", "peek", "build", "push", "kick"]:
             if data.get("direction") not in VALID_DIRECTIONS:
                 return None, {"reason": "invalid_json", "compute_deducted": 0,
-                              "action_attempted": action}
+                              "action_attempted": action, "thought": thought}
 
         # Build requires target_structure
         if action == "build":
             if data.get("target_structure") not in VALID_STRUCTURES:
                 return None, {"reason": "invalid_json", "compute_deducted": 0,
-                              "action_attempted": action}
+                              "action_attempted": action, "thought": thought}
 
         # Push requires energy
         if action == "push":
             energy = data.get("energy")
             if not isinstance(energy, int) or energy < 1:
                 return None, {"reason": "invalid_json", "compute_deducted": 0,
-                              "action_attempted": action}
+                              "action_attempted": action, "thought": thought}
 
         # Memory overflow check
         save_memory = data.get("save_memory")
@@ -102,6 +104,7 @@ class Validator:
                 "characters_submitted": len(save_memory),
                 "characters_allowed": self.memory_max,
                 "attempted_save_memory": save_memory,
+                "thought": thought,
             }
 
         return data, None

@@ -110,6 +110,36 @@ function App() {
   return (
     <div className="app-container">
       <div className="canvas-container">
+        <div className="game-header-bar">
+          <div className="logo-section">
+            <span className="logo-icon">⚔️</span>
+            <div>
+              <h1>PROMPT WARS</h1>
+              <span className="subtitle">Hexagonal Multi-Agent LLM Strategy</span>
+            </div>
+          </div>
+
+          {currentFrame && (currentFrame.start_time || currentFrame.current_time) && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              fontSize: '10px',
+              fontFamily: 'monospace',
+              color: 'var(--text-muted)',
+              borderLeft: '1px solid var(--border-color)',
+              paddingLeft: '16px',
+              lineHeight: '1.4'
+            }}>
+              <div>Start: {currentFrame.start_time || 'N/A'}</div>
+              <div>{finale ? 'End' : 'Curr'}: {finale ? finale.end_time : currentFrame.current_time}</div>
+              <div>Duration: {finale ? finale.duration : currentFrame.elapsed_duration}</div>
+            </div>
+          )}
+
+          <div className="mode-badge">
+            {(config.football_mode || currentFrame.board_state?.team_scores) ? '⚽ FOOTBALL' : '⚔️ BATTLE'} MODE
+          </div>
+        </div>
         <HexGrid 
           frame={currentFrame} 
           config={config} 
@@ -146,6 +176,7 @@ function App() {
         replay={replay}
         selectedBotId={selectedBotId}
         config={config}
+        onSelectBot={setSelectedBotId}
       />
 
       {showWinner && finale && finale.overlord_verdict && (
@@ -178,6 +209,9 @@ function App() {
             </h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', fontWeight: 600, marginTop: '4px' }}>
               TEAM {(finale.overlord_verdict.winner?.team || 'RED').toUpperCase()} • SCORE {finale.overlord_verdict.winner?.total_score}/100
+            </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '12px', fontFamily: 'monospace', marginTop: '6px', marginBottom: '12px' }}>
+              ⏱️ {finale.start_time} to {finale.end_time} • Duration: {finale.duration}
             </p>
 
             <div className={`winner-verdict ${(finale.overlord_verdict.winner?.team || 'red').toLowerCase()}`}>

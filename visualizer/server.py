@@ -57,7 +57,35 @@ def get_config():
                     data = yaml.safe_load(f)
                 else:
                     data = json.load(f)
-                return jsonify(data)
+            
+            # Load and merge external bot configs if specified
+            if "bots" in data and isinstance(data["bots"], list):
+                config_dir = os.path.dirname(os.path.abspath(config_path))
+                for i, bot_entry in enumerate(data["bots"]):
+                    if isinstance(bot_entry, dict) and "file" in bot_entry:
+                        bot_file = bot_entry["file"]
+                        path1 = os.path.join(config_dir, bot_file)
+                        path2 = os.path.join(os.path.dirname(config_dir), bot_file)
+                        path3 = os.path.abspath(bot_file)
+                        
+                        target_path = None
+                        for p in [path1, path2, path3]:
+                            if os.path.exists(p):
+                                target_path = p
+                                break
+                        if target_path:
+                            with open(target_path, "r", encoding="utf-8") as bf:
+                                _, b_ext = os.path.splitext(target_path.lower())
+                                if b_ext in ('.yaml', '.yml'):
+                                    import yaml
+                                    bot_data = yaml.safe_load(bf)
+                                else:
+                                    bot_data = json.load(bf)
+                            
+                            merged_bot = bot_data.copy()
+                            merged_bot.update(bot_entry)
+                            data["bots"][i] = merged_bot
+            return jsonify(data)
         except Exception:
             pass
 
@@ -103,24 +131,25 @@ def get_finale():
     # Sort by mtime, newest first
     existing_paths.sort(key=os.path.getmtime, reverse=True)
     
-    for replay_path in existing_paths:
-        try:
-            _, ext = os.path.splitext(replay_path.lower())
-            if ext == '.json':
-                with open(replay_path, 'r', encoding='utf-8') as f:
-                    records = json.load(f)
-                    for record in records:
-                        if record.get('type') == 'finale':
-                            return jsonify(record)
-            else:
-                with open(replay_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        if line.strip():
-                            data = json.loads(line)
-                            if data.get('type') == 'finale':
-                                return jsonify(data)
-        except Exception:
-            continue
+    # Only return the finale for the latest/active replay file to prevent loading stale finale data
+    latest_replay_path = existing_paths[0]
+    try:
+        _, ext = os.path.splitext(latest_replay_path.lower())
+        if ext == '.json':
+            with open(latest_replay_path, 'r', encoding='utf-8') as f:
+                records = json.load(f)
+                for record in records:
+                    if record.get('type') == 'finale':
+                        return jsonify(record)
+        else:
+            with open(latest_replay_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        data = json.loads(line)
+                        if data.get('type') == 'finale':
+                            return jsonify(data)
+    except Exception:
+        pass
             
     return jsonify(None)
 
@@ -134,4 +163,14 @@ def serve(path):
         return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
+    # Auto-open browser on startup (only once, avoiding reloader duplicate)
+    if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        import webbrowser
+        import threading
+        import time
+        def open_browser():
+            time.sleep(1.5)
+            webbrowser.open("http://localhost:5000")
+        threading.Thread(target=open_browser, daemon=True).start()
+
     app.run(port=5000, debug=True)
