@@ -222,37 +222,6 @@ const HexGrid = ({ frame, config, selectedBotId, onSelectBot }) => {
 
     ctx.restore();
 
-    // Scoreboard for football mode
-    if (frame.board_state && frame.board_state.team_scores) {
-      const scores = frame.board_state.team_scores;
-      // Only show if the scores object exists and looks like a football match
-      if (scores.red !== undefined && scores.blue !== undefined) {
-        ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
-        ctx.beginPath();
-        if (ctx.roundRect) {
-          ctx.roundRect(width / 2 - 100, 20, 200, 50, 10);
-        } else {
-          ctx.rect(width / 2 - 100, 20, 200, 50); // Fallback
-        }
-        ctx.fill();
-        ctx.strokeStyle = isDark ? '#334155' : '#e5e7eb';
-        ctx.stroke();
-
-        ctx.font = 'bold 24px Inter';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        ctx.fillStyle = '#ef4444';
-        ctx.fillText(`RED ${scores.red}`, width / 2 - 40, 45);
-        
-        ctx.fillStyle = '#3b82f6';
-        ctx.fillText(`${scores.blue} BLU`, width / 2 + 40, 45);
-        
-        ctx.fillStyle = isDark ? '#fff' : '#000';
-        ctx.font = 'bold 20px Inter';
-        ctx.fillText(`-`, width / 2, 45);
-      }
-    }
   }, [frame, camera, selectedBotId]);
 
   // Event Handlers

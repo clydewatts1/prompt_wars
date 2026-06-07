@@ -102,6 +102,26 @@ function App() {
   if (!config || replay.length === 0) {
     return <div style={{padding: 40}}>Loading Prompt Wars Data...</div>;
   }
+  const getTeamStats = (teamName) => {
+    if (!currentFrame || !currentFrame.bot_states) return { hp: 0, cu: 0, failures: 0, maxHp: 0 };
+    const teamBots = currentFrame.bot_states.filter(b => b.team === teamName);
+    return teamBots.reduce(
+      (acc, b) => ({
+        hp: acc.hp + (b.hp || 0),
+        cu: acc.cu + (b.compute_units || 0),
+        failures: acc.failures + (b.failures || 0),
+        maxHp: acc.maxHp + 100,
+      }),
+      { hp: 0, cu: 0, failures: 0, maxHp: 0 }
+    );
+  };
+
+  const redStats = getTeamStats('red');
+  const blueStats = getTeamStats('blue');
+  const redScore = currentFrame?.board_state?.team_scores?.red ?? 0;
+  const blueScore = currentFrame?.board_state?.team_scores?.blue ?? 0;
+  const totalScore = redScore + blueScore;
+  const redScorePct = totalScore === 0 ? 50 : (redScore / totalScore) * 100;
 
   const handleSeek = (cycleId) => {
     setCurrentCycle(cycleId);
@@ -140,6 +160,44 @@ function App() {
             {(config.football_mode || currentFrame.board_state?.team_scores) ? '⚽ FOOTBALL' : '⚔️ BATTLE'} MODE
           </div>
         </div>
+
+        {/* HTML Scoreboard Overlay */}
+        {currentFrame && currentFrame.board_state?.team_scores && (
+          <div className="scoreboard-panel">
+            <div className="scoreboard-main">
+              <span className="team-score red-score">RED {redScore}</span>
+              <span className="score-divider">-</span>
+              <span className="team-score blue-score">{blueScore} BLU</span>
+            </div>
+            
+            {/* Visual Slider of the Score */}
+            <div className="score-slider-container">
+              <div 
+                className="score-slider-fill red-fill" 
+                style={{ width: `${redScorePct}%` }}
+              ></div>
+              <div 
+                className="score-slider-fill blue-fill" 
+                style={{ width: `${100 - redScorePct}%` }}
+              ></div>
+            </div>
+
+            {/* Team HP, CU, and Failures Stats */}
+            <div className="scoreboard-stats">
+              <div className="team-stats-col red-stats-text">
+                <span>HP: {redStats.hp}/{redStats.maxHp}</span>
+                <span>CU: {redStats.cu}</span>
+                <span>FAIL: {redStats.failures}</span>
+              </div>
+              <div className="stats-divider">|</div>
+              <div className="team-stats-col blue-stats-text">
+                <span>HP: {blueStats.hp}/{blueStats.maxHp}</span>
+                <span>CU: {blueStats.cu}</span>
+                <span>FAIL: {blueStats.failures}</span>
+              </div>
+            </div>
+          </div>
+        )}
         <HexGrid 
           frame={currentFrame} 
           config={config} 
